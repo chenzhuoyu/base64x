@@ -105,6 +105,7 @@ func benchmarkStdlibWithSize(b *testing.B, nb int) {
     buf := make([]byte, nb)
     dst := make([]byte, base64.StdEncoding.EncodedLen(nb))
     _, _ = io.ReadFull(rand.Reader, buf)
+    b.SetBytes(int64(nb))
     b.ResetTimer()
     b.RunParallel(func(pb *testing.PB) {
         for pb.Next() {
@@ -117,6 +118,7 @@ func benchmarkBase64xWithSize(b *testing.B, nb int) {
     buf := make([]byte, nb)
     dst := make([]byte, StdEncoding.EncodedLen(nb))
     _, _ = io.ReadFull(rand.Reader, buf)
+    b.SetBytes(int64(nb))
     b.ResetTimer()
     b.RunParallel(func(pb *testing.PB) {
         for pb.Next() {
@@ -170,6 +172,7 @@ func TestDecoderError(t *testing.T) {
 func benchmarkStdlibDecoder(b *testing.B, v string) {
     src := []byte(v)
     dst := make([]byte, base64.StdEncoding.DecodedLen(len(v)))
+    b.SetBytes(int64(len(v)))
     b.ResetTimer()
     b.RunParallel(func(pb *testing.PB) {
         for pb.Next() {
@@ -181,6 +184,7 @@ func benchmarkStdlibDecoder(b *testing.B, v string) {
 func benchmarkBase64xDecoder(b *testing.B, v string) {
     src := []byte(v)
     dst := make([]byte, StdEncoding.DecodedLen(len(v)))
+    b.SetBytes(int64(len(v)))
     b.ResetTimer()
     b.RunParallel(func(pb *testing.PB) {
         for pb.Next() {

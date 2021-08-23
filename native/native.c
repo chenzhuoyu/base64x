@@ -4,6 +4,7 @@
 
 #define MODE_URL        1
 #define MODE_RAW        2
+#define MODE_AVX2       4
 
 #define as_m32v(v)      (*(uint32_t *)(v))
 #define as_m64v(v)      (*(uint64_t *)(v))
@@ -92,7 +93,7 @@ void b64encode(struct slice_t *out, const struct slice_t *src, int mode) {
 
     /* SIMD 24 bytes loop, but the SIMD instruction will load 4 bytes
      * past the end, so it's safe only if there are 28 bytes or more left */
-    while (ip <= ie - 28) {
+    while ((ip <= ie - 28) && (mode & MODE_AVX2) != 0) {
         __m128i v0 = _mm_loadu_si128 (as_m128c(ip));
         __m128i v1 = _mm_loadu_si128 (as_m128c(ip + 12));
         __m256i vv = encode_avx2     (v0, v1, vt);
@@ -104,7 +105,7 @@ void b64encode(struct slice_t *out, const struct slice_t *src, int mode) {
     }
 
     /* can do one more 24 bytes round, but needs special handling */
-    if (ip <= ie - 24) {
+    if ((ip <= ie - 24) && (mode & MODE_AVX2) != 0) {
         __m128i v0 = _mm_loadu_si128 (as_m128c(ip));
         __m128i v1 = _mm_loadu_si128 (as_m128c(ip + 8));
         __m128i v2 = _mm_srli_si128  (v1, 4);
@@ -388,7 +389,7 @@ ssize_t b64decode(struct slice_t *out, const char *src, size_t nb, int mode) {
     /* decode every 32 bytes, the final round should be handled separately, because the
      * SIMD instruction performs 32-byte store, and it might store past the end of the
      * output buffer */
-    while (ip <= ie - 32) {
+    while ((ip <= ie - 32) && (mode & MODE_AVX2) != 0) {
         vv = _mm256_loadu_si256(as_m256c(ip));
         vv = decode_avx2(vv, &ep, dt);
 

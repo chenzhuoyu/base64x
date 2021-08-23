@@ -14,7 +14,7 @@ func ___asm2asm_compiled_code__DO_NOT_CALL_THIS_SYMBOL___()
 
 var (
     _func__base      = ___asm2asm_compiled_code__DO_NOT_CALL_THIS_SYMBOL___
-    _subr__b64decode = **(**uintptr)(unsafe.Pointer(&_func__base)) + 1447
+    _subr__b64decode = **(**uintptr)(unsafe.Pointer(&_func__base)) + 1489
     _subr__b64encode = **(**uintptr)(unsafe.Pointer(&_func__base)) + 224
 )
 
