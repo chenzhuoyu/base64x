@@ -2,16 +2,8 @@
 
 CFLAGS := -mavx
 CFLAGS += -mavx2
-CFLAGS += -mbmi
-CFLAGS += -mbmi2
-CFLAGS += -mfma
-CFLAGS += -msse
-CFLAGS += -msse2
-CFLAGS += -msse3
-CFLAGS += -msse4
-CFLAGS += -mssse3
+CFLAGS += -mno-bmi
 CFLAGS += -mno-red-zone
-CFLAGS += -ffast-math
 CFLAGS += -fno-asynchronous-unwind-tables
 CFLAGS += -fno-exceptions
 CFLAGS += -fno-rtti
