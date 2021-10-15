@@ -3,19 +3,14 @@
 
 package base64x
 
-import (
-    `unsafe`
-)
-
 //go:nosplit
 //go:noescape
 //goland:noinspection ALL
-func ___asm2asm_compiled_code__DO_NOT_CALL_THIS_SYMBOL___()
+func __native_entry__() uintptr
 
 var (
-    _func__base      = ___asm2asm_compiled_code__DO_NOT_CALL_THIS_SYMBOL___
-    _subr__b64decode = **(**uintptr)(unsafe.Pointer(&_func__base)) + 1489
-    _subr__b64encode = **(**uintptr)(unsafe.Pointer(&_func__base)) + 224
+    _subr__b64decode = __native_entry__() + 1246
+    _subr__b64encode = __native_entry__() + 237
 )
 
 var (
