@@ -167,6 +167,18 @@ func TestDecoderError(t *testing.T) {
     if err != base64.CorruptInputError(7) {
         panic(err)
     }
+    _, err = StdEncoding.DecodeString("123456")
+    if err != base64.CorruptInputError(6) {
+        panic(err)
+    }
+    _, err = StdEncoding.DecodeString("1234;6")
+    if err != base64.CorruptInputError(4) {
+        panic(err)
+    }
+    _, err = StdEncoding.DecodeString("F\xaa\xaa\xaa\xaaDDDDDDDDDDDDD//z")
+    if err != base64.CorruptInputError(1) {
+        panic(err)
+    } 
 }
 
 func benchmarkStdlibDecoder(b *testing.B, v string) {
