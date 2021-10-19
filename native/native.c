@@ -278,6 +278,7 @@ static inline __m256i decode_avx2(__m256i v0, int *pos, const uint8_t *tab) {
     return (*pos = np), r4;
 }
 
+/* Return 0 if success, otherwise return the error position + 1 */
 static inline int64_t decode_block(
     const char *    ie,
     const char **   ipp,
@@ -316,16 +317,16 @@ static inline int64_t decode_block(
 
     /* never ends with 1 characer */
     if (nb == 1) {
-        return ip - *ipp;
+        return ip - *ipp + 1;
     }
 
 #define P2() { E2() P1() P1() }
-#define P1() { if (*ip++ != '=') return ip - *ipp; }
-#define E2() { if (ip >= ie - 1) return ip - *ipp; }
-#define R1() { if ((mode & MODE_RAW) == 0) return ip - *ipp; }
+#define P1() { if (*ip++ != '=') return ip - *ipp; } // ip has been added 1
+#define E2() { if (ip >= ie - 1) return ip - *ipp + 1; }
+#define R1() { if ((mode & MODE_RAW) == 0) return ip - *ipp + 1; }
 
 #define align_val() { v0 <<= 6 * (4 - nb); }
-#define parse_eof() { if (ip < ie) return ip - *ipp; }
+#define parse_eof() { if (ip < ie) return ip - *ipp + 1; }
 #define check_pad() { if (ip == ie) R1() else if (nb == 3) P1() else P2() }
 
     /* not enough characters, can either be EOF or paddings or illegal characters */
@@ -374,9 +375,9 @@ ssize_t b64decode(struct slice_t *out, const char *src, size_t nb, int mode) {
     char *oe = out->buf + out->cap;
 
     /* input buffer */
-    const char *    ib = src;
-    const char *    ip = src;
-    const char *    ie = src + nb;
+    const uint8_t * ib = src;
+    const uint8_t * ip = src;
+    const uint8_t * ie = src + nb;
     const uint8_t * dt = VecDecodeTableStd;
     const uint8_t * st = VecDecodeCharsetStd;
 
@@ -484,7 +485,7 @@ ssize_t b64decode(struct slice_t *out, const char *src, size_t nb, int mode) {
     }
 
     /* decode the last few bytes */
-    if (ip < ie) {
+    while (ip < ie) {
         if ((dv = decode_block(ie, &ip, &op, st, mode)) != 0) {
             return ib - ip - dv;
         }
