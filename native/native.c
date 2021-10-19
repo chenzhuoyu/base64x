@@ -329,6 +329,10 @@ static inline int64_t decode_block(
 #define parse_eof() { if (ip < ie) return ip - *ipp + 1; }
 #define check_pad() { if (ip == ie) R1() else if (nb == 3) P1() else P2() }
 
+    if (nb < 4 && (mode & MODE_RAW) != 0 && ip < ie) {
+        return ip - *ipp + 1;
+    }
+
     /* not enough characters, can either be EOF or paddings or illegal characters */
     if (nb < 4) {
         check_pad()

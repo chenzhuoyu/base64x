@@ -158,6 +158,14 @@ func TestDecoder(t *testing.T) {
     }
 }
 
+func TestDecoderPainc(t *testing.T) {
+    enc := "nXlI0lmeXmWesZqaEv6KB8cHzOhsgfLZ44m1mO69jnRRYDI+XHQ6X9d35rWWx/+c"
+    // dec := "\x9dyH\xd2Y\x9e^e\x9e\xb1\x9a\x9a\x12\xfe\x8a\x07\xc7\x07\xcc\xe8l\x81" +
+    // "\xf2\xd9\xe3\x89\xb5\x98\xee\xbd\x8etQ`2>\\t:_\xd7w\xe6\xb5\x96\xc7\xff\x9c"
+    dbuf := make([]byte, StdEncoding.DecodedLen(len(enc)))
+    StdEncoding.Decode(dbuf, []byte(enc))
+}
+
 func TestDecoderError(t *testing.T) {
     _, err := StdEncoding.DecodeString("!aGVsbG8sIHdvcmxk")
     if err != base64.CorruptInputError(0) {
