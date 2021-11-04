@@ -280,18 +280,18 @@ static inline __m256i decode_avx2(__m256i v0, int *pos, const uint8_t *tab) {
 
 /* Return 0 if success, otherwise return the error position + 1 */
 static inline int64_t decode_block(
-    const char *    ie,
-    const char **   ipp,
-    char **         opp,
-    const uint8_t * tab,
-    int             mode
+    const uint8_t *  ie,
+    const uint8_t ** ipp,
+    char **          opp,
+    const uint8_t *  tab,
+    int              mode
 ) {
     int      nb = 0;
     uint32_t v0 = 0;
 
     /* buffer pointers */
-    char *       op = *opp;
-    const char * ip = *ipp;
+    char *          op = *opp;
+    const uint8_t * ip = *ipp;
 
     /* load up to 4 characters */
     while (nb < 4 && ip < ie) {
@@ -375,11 +375,11 @@ ssize_t b64decode(struct slice_t *out, const char *src, size_t nb, int mode) {
     char *oe = out->buf + out->cap;
 
     /* input buffer */
-    const uint8_t * ib = src;
-    const uint8_t * ip = src;
-    const uint8_t * ie = src + nb;
-    const uint8_t * dt = VecDecodeTableStd;
-    const uint8_t * st = VecDecodeCharsetStd;
+    const uint8_t *dt = VecDecodeTableStd;
+    const uint8_t *st = VecDecodeCharsetStd;
+    const uint8_t *ib = (const uint8_t *)src;
+    const uint8_t *ip = (const uint8_t *)src;
+    const uint8_t *ie = (const uint8_t *)src + nb;
 
     /* check for URL encoding */
     if (mode & MODE_URL) {
