@@ -1864,7 +1864,16 @@ _VecDecodeCharsetURL:
 	QUAD $0xffffffffffffffff; QUAD $0xffffffffffffffff // .ascii 16, '\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
 	QUAD $0xffffffffffffffff; QUAD $0xffffffffffffffff // .ascii 16, '\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
 
-TEXT ·__b64decode(SB), NOSPLIT, $0 - 40
+TEXT ·__b64decode(SB), NOSPLIT | NOFRAME, $0 - 40
+	NO_LOCAL_POINTERS
+
+_entry:
+	MOVQ (TLS), R14
+	LEAQ -152(SP), R12
+	CMPQ R12, 16(R14)
+	JBE  _stack_grow
+
+_b64decode:
 	MOVQ out+0(FP), DI
 	MOVQ src+8(FP), SI
 	MOVQ len+16(FP), DX
@@ -1873,9 +1882,26 @@ TEXT ·__b64decode(SB), NOSPLIT, $0 - 40
 	MOVQ AX, ret+32(FP)
 	RET
 
-TEXT ·__b64encode(SB), NOSPLIT, $0 - 24
+_stack_grow:
+	CALL runtime·morestack_noctxt<>(SB)
+	JMP  _entry
+
+TEXT ·__b64encode(SB), NOSPLIT | NOFRAME, $0 - 24
+	NO_LOCAL_POINTERS
+
+_entry:
+	MOVQ (TLS), R14
+	LEAQ -40(SP), R12
+	CMPQ R12, 16(R14)
+	JBE  _stack_grow
+
+_b64encode:
 	MOVQ out+0(FP), DI
 	MOVQ src+8(FP), SI
 	MOVQ mode+16(FP), DX
 	LEAQ ·__native_entry__+237(SB), AX // _b64encode
 	JMP  AX
+
+_stack_grow:
+	CALL runtime·morestack_noctxt<>(SB)
+	JMP  _entry
