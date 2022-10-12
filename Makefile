@@ -6,7 +6,7 @@ X86_CFLAGS += -mavx2
 X86_CFLAGS += -mno-bmi
 
 ARM_CFLAGS := -march=armv8-a+fp+simd
-ARM_CFLAGS += -Itools/sse2neon
+#ARM_CFLAGS += -Itools/sse2neon
 
 CFLAGS := -mno-red-zone
 CFLAGS += -fno-asynchronous-unwind-tables

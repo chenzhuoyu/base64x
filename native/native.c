@@ -1,6 +1,6 @@
 #include <stdint.h>
 #if defined(__aarch64__)
-#include <sse2neon.h>
+// #include <sse2neon.h>
 #define HAS_AVX 0
 #else
 #include <immintrin.h>
