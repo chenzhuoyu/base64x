@@ -1,5 +1,11 @@
 #include <stdint.h>
+#if defined(__aarch64__)
+#include <sse2neon.h>
+#define HAS_AVX 0
+#else
 #include <immintrin.h>
+#define HAS_AVX 1
+#endif
 #include <sys/types.h>
 
 #define MODE_URL        1
@@ -51,6 +57,7 @@ static const uint8_t VecEncodeCharsetURL[32] = {
     '0' - 52, '0' - 52, '0' - 52, '-' - 62, '_' - 63, 'A'     ,        0,        0,
 };
 
+#if HAS_AVX
 static inline __m256i encode_avx2(__m128i v0, __m128i v1, const uint8_t *tab) {
     __m256i vv = _mm256_set_m128i    (v1, v0);
     __m256i sh = _mm256_loadu_si256  (as_m256c(VecEncodeShuffles));
@@ -69,6 +76,7 @@ static inline __m256i encode_avx2(__m128i v0, __m128i v1, const uint8_t *tab) {
     __m256i r3 = _mm256_add_epi8     (vi, r2);
     return r3;
 }
+#endif
 
 /** Function Implementations **/
 
@@ -91,6 +99,7 @@ void b64encode(struct slice_t *out, const struct slice_t *src, int mode) {
         vt = VecEncodeCharsetURL;
     }
 
+#if HAS_AVX
     /* SIMD 24 bytes loop, but the SIMD instruction will load 4 bytes
      * past the end, so it's safe only if there are 28 bytes or more left */
     while ((ip <= ie - 28) && (mode & MODE_AVX2) != 0) {
@@ -116,6 +125,7 @@ void b64encode(struct slice_t *out, const struct slice_t *src, int mode) {
         op += 32;
         ip += 24;
     }
+#endif
 
     /* no more bytes */
     if (ip == ie) {
@@ -244,6 +254,7 @@ static const uint8_t VecDecodeCharsetURL[256] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
 
+#if HAS_AVX
 static inline void memcopy_24(char *dp, const uint8_t *sp) {
     *(uint64_t *)(dp +  0) = *(const uint64_t *)(sp +  0);
     *(uint64_t *)(dp +  8) = *(const uint64_t *)(sp +  8);
@@ -277,6 +288,7 @@ static inline __m256i decode_avx2(__m256i v0, int *pos, const uint8_t *tab) {
     int32_t np = __builtin_ctzll             (mp | 0xffffffff00000000);
     return (*pos = np), r4;
 }
+#endif
 
 /* Return 0 if success, otherwise return the error position + 1 */
 static inline int64_t decode_block(
@@ -359,10 +371,12 @@ static inline int64_t decode_block(
 }
 
 ssize_t b64decode(struct slice_t *out, const char *src, size_t nb, int mode) {
+    int64_t dv;
+#if HAS_AVX
     int     ep;
     __m256i vv;
-    int64_t dv;
     uint8_t buf[32] = {0};
+#endif
 
     /* check for empty input */
     if (nb == 0) {
@@ -387,6 +401,7 @@ ssize_t b64decode(struct slice_t *out, const char *src, size_t nb, int mode) {
         st = VecDecodeCharsetURL;
     }
 
+#if HAS_AVX
     /* decode every 32 bytes, the final round should be handled separately, because the
      * SIMD instruction performs 32-byte store, and it might store past the end of the
      * output buffer */
@@ -415,6 +430,7 @@ ssize_t b64decode(struct slice_t *out, const char *src, size_t nb, int mode) {
         ip += 32;
         op += 24;
     }
+#endif
 
     /* handle the remaining bytes with scalar code (8 byte loop) */
     while (ip <= ie - 8 && op <= oe - 8) {
