@@ -394,7 +394,7 @@ decode:
     switch (nb) {
         case 4: op[2] = (v0 >>  0) & 0xff;
         case 3: op[1] = (v0 >>  8) & 0xff;
-        case 2: op[0] = (v0 >> 16) & 0xff; 
+        case 2: op[0] = (v0 >> 16) & 0xff;
     }
 
     /* update the pointers */
