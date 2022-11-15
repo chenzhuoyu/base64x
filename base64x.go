@@ -15,6 +15,7 @@ const (
     _MODE_URL  = 1 << 0
     _MODE_RAW  = 1 << 1
     _MODE_AVX2 = 1 << 2
+    _MODE_JSON = 1 << 3
 )
 
 // StdEncoding is the standard base64 encoding, as defined in
@@ -36,6 +37,9 @@ const RawStdEncoding Encoding = _MODE_RAW
 //
 // This is the same as URLEncoding but omits padding characters.
 const RawURLEncoding Encoding = _MODE_RAW | _MODE_URL
+
+// JSONStdEncoding is the StdEncoding and encoded as JSON string as RFC 8259.
+const JSONStdEncoding Encoding = _MODE_JSON;
 
 var (
     archFlags = 0

@@ -10,7 +10,7 @@ CFLAGS += -fno-exceptions
 CFLAGS += -fno-builtin
 CFLAGS += -fno-rtti
 CFLAGS += -nostdlib
-CFLAGS += -O3
+CFLAGS += -O3 -DDEBUG
 
 NATIVE_ASM := $(wildcard native/*.S)
 NATIVE_SRC := $(wildcard native/*.h)

@@ -5,6 +5,7 @@
 #define MODE_URL        1
 #define MODE_RAW        2
 #define MODE_AVX2       4
+#define MODE_JSON       8
 
 #define as_m32v(v)      (*(uint32_t *)(v))
 #define as_m64v(v)      (*(uint64_t *)(v))
@@ -15,6 +16,8 @@
 #define as_m8c(v)       ((const uint8_t *)(v))
 #define as_m128c(v)     ((const __m128i *)(v))
 #define as_m256c(v)     ((const __m256i *)(v))
+
+#define always_inline   inline __attribute__((always_inline)) 
 
 struct slice_t {
     char * buf;
@@ -51,7 +54,7 @@ static const uint8_t VecEncodeCharsetURL[32] = {
     '0' - 52, '0' - 52, '0' - 52, '-' - 62, '_' - 63, 'A'     ,        0,        0,
 };
 
-static inline __m256i encode_avx2(__m128i v0, __m128i v1, const uint8_t *tab) {
+static always_inline __m256i encode_avx2(__m128i v0, __m128i v1, const uint8_t *tab) {
     __m256i vv = _mm256_set_m128i    (v1, v0);
     __m256i sh = _mm256_loadu_si256  (as_m256c(VecEncodeShuffles));
     __m256i in = _mm256_shuffle_epi8 (vv, sh);
@@ -244,13 +247,13 @@ static const uint8_t VecDecodeCharsetURL[256] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
 
-static inline void memcopy_24(char *dp, const uint8_t *sp) {
+static always_inline void memcopy_24(char *dp, const uint8_t *sp) {
     *(uint64_t *)(dp +  0) = *(const uint64_t *)(sp +  0);
     *(uint64_t *)(dp +  8) = *(const uint64_t *)(sp +  8);
     *(uint64_t *)(dp + 16) = *(const uint64_t *)(sp + 16);
 }
 
-static inline __m256i decode_avx2(__m256i v0, int *pos, const uint8_t *tab) {
+static always_inline __m256i decode_avx2(__m256i v0, int *pos, const uint8_t *tab) {
     __m256i v1 = _mm256_srli_epi32           (v0, 4);
     __m256i vl = _mm256_and_si256            (v0, _mm256_set1_epi8(0x0f));
     __m256i vh = _mm256_and_si256            (v1, _mm256_set1_epi8(0x0f));
@@ -278,8 +281,66 @@ static inline __m256i decode_avx2(__m256i v0, int *pos, const uint8_t *tab) {
     return (*pos = np), r4;
 }
 
+
+#define ALL_01h     (~0ul / 255)
+#define ALL_7fh     (ALL_01h * 127)
+#define ALL_80h     (ALL_01h * 128)
+
+static always_inline uint32_t hasless(uint32_t x, uint8_t n) {
+    return (x - ALL_01h * n) & ~x & ALL_80h;
+}
+
+static always_inline uint32_t hasmore(uint32_t x, uint8_t n) {
+    return (x + ALL_01h * (127 - n) | x) & ALL_80h;
+}
+
+static always_inline uint32_t hasbetween(uint32_t x, uint8_t m, uint8_t n) {
+    return (ALL_01h * (127 + n) - (x & ALL_7fh) & ~x & (x & ALL_7fh) + ALL_01h * (127 - m)) & ALL_80h;
+}
+
+#undef ALL_01h
+#undef ALL_7fh
+#undef ALL_80h
+
+static always_inline char unhex16_is(const uint8_t *s) {
+    uint32_t v = *(uint32_t *)s;
+    return !(hasless(v, '0') || hasmore(v, 'f') || hasbetween(v, '9', 'A') || hasbetween(v, 'F', 'a'));
+}
+
+static always_inline uint32_t unhex16_fast(const uint8_t *s) {
+    uint32_t a = __builtin_bswap32(*(uint32_t *)s);
+    uint32_t b = 9 * ((~a & 0x10101010) >> 4) + (a & 0x0f0f0f0f);
+    uint32_t c = (b >> 4) | b;
+    uint32_t d = ((c >> 8) & 0xff00) | (c & 0x00ff);
+    return d;
+}
+
+static always_inline uint8_t unescape_asc(const uint8_t * ie, const uint8_t ** ipp) {
+    const uint8_t * ee = (*ipp) + 1;
+    uint32_t ch = 0xff; 
+    /* check eof */
+    if (ee > ie) {
+        return 0xff;
+    }
+    switch (ee[-1]) {
+        case 'r': ch = '\r'; break;
+        case 'n': ch = '\n'; break;
+        case '/': ch = '/'; break;
+        case 'u': /* neee more 4 bytes */
+        if (ie - ee >= 4 && unhex16_is(ee)) { 
+            ch = unhex16_fast(ee);
+            /* if not ascii, as 0xff */
+            ch = ch < 128 ? ch : 0xff;
+            ee += 4;
+        }
+        break;
+    }
+    *ipp = ee;
+    return ch;
+}
+
 /* Return 0 if success, otherwise return the error position + 1 */
-static inline int64_t decode_block(
+static always_inline int64_t decode_block(
     const uint8_t *  ie,
     const uint8_t ** ipp,
     char **          opp,
@@ -292,70 +353,74 @@ static inline int64_t decode_block(
     /* buffer pointers */
     char *          op = *opp;
     const uint8_t * ip = *ipp;
+    uint8_t id = 0;
+    uint8_t ch = 0;
+    int pad = 0;
+
+#define may_unescape() { if (ch == '\\' && (mode & MODE_JSON)) ch = unescape_asc(ie, &ip); }
+#define skip_newlines() { if (ch == '\r' || ch == '\n') continue; }
 
     /* load up to 4 characters */
-    while (nb < 4 && ip < ie) {
-        uint8_t id;
-        uint8_t ch = *ip;
-
-        /* skip new lines */
-        if (ch == '\r' || ch == '\n') {
-            ip++;
-            continue;
-        }
+    while (ip < ie && nb < 4) {
+        ch = *ip++;
+        may_unescape();
+        skip_newlines();
 
         /* lookup the index, and check for invalid characters */
         if ((id = tab[ch]) == 0xff) {
-            break;
+            if ((mode & MODE_RAW) || ch != '=' || nb < 2) goto error;
+            pad++; goto tail;
         }
 
-        /* move to next character */
-        ip++;
-        nb++;
+        /* decode the character */
         v0 = (v0 << 6) | id;
+        nb++;
     }
 
-    /* never ends with 1 characer */
-    if (nb == 1) {
-        return ip - *ipp + 1;
+    if (nb == 0) {
+        /* update the pointers */
+        *ipp = ip;
+        return 0;
     }
 
-#define P2() { E2() P1() P1() }
-#define P1() { if (*ip++ != '=') return ip - *ipp; } // ip has been added 1
-#define E2() { if (ip >= ie - 1) return ip - *ipp + 1; }
-#define R1() { if ((mode & MODE_RAW) == 0) return ip - *ipp + 1; }
-
-#define align_val() { v0 <<= 6 * (4 - nb); }
-#define parse_eof() { if (ip < ie) return ip - *ipp + 1; }
-#define check_pad() { if (ip == ie) R1() else if (nb == 3) P1() else P2() }
-
-    /* not enough characters, can either be EOF or paddings or illegal characters */
-    if (nb < 4) {
-        check_pad()
-        parse_eof()
-        align_val()
+    /* check eof, MODE_STD need paddings */
+    if (ip >= ie && nb != 4) {
+        if (!(mode & MODE_RAW) || nb == 1) goto error;
     }
 
-#undef check_pad
-#undef parse_eof
-#undef align_val
-
-#undef R1
-#undef E2
-#undef P1
-#undef P2
-
-    /* decode into output */
+decode:
+    v0 <<= 6 * (4 - nb); 
+    /* ends with eof or 4 characters, decode into output */
     switch (nb) {
         case 4: op[2] = (v0 >>  0) & 0xff;
         case 3: op[1] = (v0 >>  8) & 0xff;
-        case 2: op[0] = (v0 >> 16) & 0xff;
+        case 2: op[0] = (v0 >> 16) & 0xff; 
     }
 
     /* update the pointers */
     *ipp = ip;
     *opp = op + nb - 1;
     return 0;
+
+tail:
+    /* loop for more paddings */
+    while (ip < ie) {
+        ch = *ip++;
+        may_unescape();
+        skip_newlines();
+        if (ch != '=') goto error;
+        if (++pad + nb > 4) goto error;
+    }
+    goto decode;
+#undef may_unescape
+#undef skip_newlines
+
+error:
+    /* update eof error position */
+    if (ip == ie) ip++;
+    return ip - *ipp;
+
+
 }
 
 ssize_t b64decode(struct slice_t *out, const char *src, size_t nb, int mode) {
@@ -390,7 +455,10 @@ ssize_t b64decode(struct slice_t *out, const char *src, size_t nb, int mode) {
     /* decode every 32 bytes, the final round should be handled separately, because the
      * SIMD instruction performs 32-byte store, and it might store past the end of the
      * output buffer */
-    while ((ip <= ie - 32) && (mode & MODE_AVX2) != 0) {
+    if ((mode & MODE_AVX2) == 0) {
+        goto scalar;
+    }
+    while ((ip <= ie - 32) && (op <= oe - 32)) {
         vv = _mm256_loadu_si256(as_m256c(ip));
         vv = decode_avx2(vv, &ep, dt);
 
@@ -403,19 +471,14 @@ ssize_t b64decode(struct slice_t *out, const char *src, size_t nb, int mode) {
             }
         }
 
-        /* check for store boundary, perform the last 24-byte store if needed */
-        if (op <= oe - 32) {
-            _mm256_storeu_si256(as_m256p(op), vv);
-        } else {
-            _mm256_storeu_si256(as_m256p(buf), vv);
-            memcopy_24(op, buf);
-        }
+        _mm256_storeu_si256(as_m256p(op), vv);
 
         /* move to next block */
         ip += 32;
         op += 24;
     }
 
+scalar:
     /* handle the remaining bytes with scalar code (8 byte loop) */
     while (ip <= ie - 8 && op <= oe - 8) {
         uint8_t v0 = st[ip[0]];
