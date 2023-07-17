@@ -8,7 +8,7 @@ import (
     `github.com/davecgh/go-spew/spew`
 )
 
-func FuzzBase64(f *testing.F) {
+func FuzzMain(f *testing.F) {
     var corpus = []string {
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_",
