@@ -4,8 +4,10 @@ import (
     `crypto/rand`
     `encoding/base64`
     `io`
+    `reflect`
     `strings`
     `testing`
+    `unsafe`
 )
 
 type TestPair struct {
@@ -160,6 +162,33 @@ func testEqual(t *testing.T, msg string, args ...interface{}) bool {
     return true
 }
 
+func TestEncoderRecover(t *testing.T) {
+    t.Run("nil dst", func(t *testing.T) {
+        in := []byte("abc")
+        defer func(){
+            if v := recover(); v != nil {
+                println("recover:", v)
+            } else {
+                t.Fatal("not recover")
+            }
+        }()
+        b64encode(nil, &in, int(StdEncoding))
+    })
+    t.Run("nil src", func(t *testing.T) {
+        in := []byte("abc")
+        (*reflect.SliceHeader)(unsafe.Pointer(&in)).Data = uintptr(0)
+        out := make([]byte, 0, 10)
+        defer func(){
+            if v := recover(); v != nil {
+                println("recover:", v)
+            } else {
+                t.Fatal("not recover")
+            }
+        }()
+        b64encode(&out, &in, int(StdEncoding))
+    })
+}
+
 func TestEncoder(t *testing.T) {
     for _, p := range pairs {
         for _, tt := range encodingTests {
@@ -224,6 +253,31 @@ func TestDecoder(t *testing.T) {
             testEqual(t, "DecodeString(%q) = %q, want %q", encoded, string(dbuf), p.decoded)
         }
     }
+}
+
+func TestDecoderRecover(t *testing.T) {
+    t.Run("nil dst", func(t *testing.T) {
+        in := []byte("abc")
+        defer func(){
+            if v := recover(); v != nil {
+                println("recover:", v)
+            } else {
+                t.Fatal("not recover")
+            }
+        }()
+        b64decode(nil, unsafe.Pointer(&in[0]), len(in), int(StdEncoding))
+    })
+    t.Run("nil src", func(t *testing.T) {
+        out := make([]byte, 0, 10)
+        defer func(){
+            if v := recover(); v != nil {
+                println("recover:", v)
+            } else {
+                t.Fatal("not recover")
+            }
+        }()
+        b64decode(&out, nil, 5, int(StdEncoding))
+    })
 }
 
 func TestDecoderCRLF(t *testing.T) {
